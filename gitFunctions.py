@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 import re
 
+from os.path import expanduser
+
 import shouter
 import shell
 import configuration
@@ -118,6 +120,11 @@ class Commiter:
                 if was_same_file_name and file_was_renamed:
                     shell.execute("git rm --cached %s" % previousFileName)
             os.chdir(cwd)
+
+    @staticmethod
+    def getsandbox():
+        sandbox = os.path.join(configuration.get().workDirectory, configuration.get().clonedGitRepoName) + "/"
+        return sandbox
 
     @staticmethod
     def getcommitcommand(changeentry):
@@ -347,3 +354,11 @@ class ExtensionFilter:
                         # append a newline
                         repositoryfilestoignore.append('/' + repositoryfile.replace('\\', '\\\\') + os.linesep)
         return repositoryfilestoignore
+
+
+class Helper:
+
+    @staticmethod
+    def getuserhome():
+        home = expanduser("~")
+        return home

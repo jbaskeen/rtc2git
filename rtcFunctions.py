@@ -8,7 +8,7 @@ from configuration import ComponentBaseLineEntry
 import sorter
 import shell
 import shouter
-from gitFunctions import Commiter, Differ
+from gitFunctions import Commiter, Differ, Helper
 
 
 class RTCInitializer:
@@ -57,9 +57,42 @@ class WorkspaceHandler:
         command = "%s load -r %s %s --force" % (self.scmcommand, self.repo, self.workspace)
         if self.config.includecomponentroots:
             command += " --include-root"
-        shouter.shout("Start (re)loading current workspace: " + command)
+        shouter.shout("Start loading current workspace: " + command)
         shell.execute(command)
         shouter.shout("Load of workspace finished")
+        Commiter.restore_shed_gitignore(Commiter.get_untracked_statuszlines())
+
+    def reload(self):
+
+        # https://jazz.net/forum/questions/133821/how-do-i-avoid-could-not-unload-due-to-name-collisions/133857
+        sandbox = Commiter.getsandbox()
+        # shouter.shout("sandbox... " + sandbox)
+        # shouter.shout("removing migration git folder contents...")
+
+        shell.execute("rm -rf " + sandbox + "* " + sandbox + ".jazz5/ " + sandbox + ".jazzShed/")
+
+        # shouter.shout("removing migration git folder complete...")
+        # shouter.shout("listing sandbox...")
+        # shell.execute("ls -al " + sandbox)
+
+        # http://www-01.ibm.com/support/docview.wss?uid=swg21619911
+        # shouter.shout("removing .jazz-scm/... ")
+        home = Helper.getuserhome()
+        # shouter.shout("user home... " + home)
+        shell.execute("rm -rf " + home + "/.jazz-scm/")
+
+        # shouter.shout("logging back in as user after ~/.jazz-scm cleanup...")
+        config = configuration.get()
+        shell.execute("%s login -r %s -u '%s' -P '%s'" % (config.scmcommand, config.repo, config.user, config.password))
+        # shouter.shout("re-login complete...")
+
+        # shouter.shout("cleanup/login complete, running load as a forced reload...")
+        command = "%s load -d %s -f --all -r %s %s" % (self.scmcommand, sandbox, self.repo, self.workspace)
+        if self.config.includecomponentroots:
+            command += " --include-root"
+        shouter.shout("Start re-loading current workspace: " + command)
+        shell.execute(command)
+        shouter.shout("ReLoad of workspace finished")
         Commiter.restore_shed_gitignore(Commiter.get_untracked_statuszlines())
 
 
@@ -93,7 +126,7 @@ class WorkspaceHandler:
 
 
 class Changes:
-    
+
     latest_accept_command = ""
 
     @staticmethod
@@ -213,6 +246,8 @@ class ImportHandler:
             if not changeEntry.isAccepted(): # change could already be accepted from a retry
                 if not Changes.accept(self.acceptlogpath, changeEntry):
                     shouter.shout("Change wasnt succesfully accepted into workspace")
+                    shouter.shout("Attempting reload of Workspace")
+                    WorkspaceHandler().reload()
                     # self.retryacceptincludingnextchangesets(changeEntry, changeentries)
                 if not Differ.has_diff():
                     # no differences found - force reload of the workspace
